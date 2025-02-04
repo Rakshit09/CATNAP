@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bridging Tool</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Zoom Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.0.0"></script>
+    <!-- Include Meta Tag for CSRF Token -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
+
+    <!-- Custom Styles -->
+    <style>
+        .mapping-section {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .currency-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+        .currency-selector select {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            background-color: #fff;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .currency-selector select:hover {
+            border-color: #cbd5e0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+       
+        .tab-content {
+            padding: 15px;
+        }
+        .percent-change-positive {
+            color: green;
+        }
+        .percent-change-negative {
+            color: red;
+        }
+        
+        .number-cell {
+            font-size: 1em;
+        }
+        .percent-cell {
+            font-size: 1em;
+            font-weight: bold;
+        }
+        /* Adjust chart sizes */
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+        .chart-wrapper {
+            max-width: 500px;
+            height: 300px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .chart-wrapper-geography {
+            max-width: 1200px;
+            height: 400px;   
+            margin: 0 auto;
+        }
+        .mt-4 {
+            margin-top: 80px;
+        }
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+        .results-section,
+        .charts-section,
+        .ai-summary-section {
+            display: none;
+        }
+        
+        .total-row {
+            font-weight: bold;
+        }
+        .data-section {
+            display: none;
+            margin-bottom: 2rem;
+        }
+        /* Table styling */
+        .table-values {
+            width: 100%;
+            table-layout: fixed;
+        }
+        
+        .table-contribution {
+            width: 100%;
+            table-layout: fixed;
+        }
+        
+        .table-values td, .table-values th {
+            padding: 8px;
+            vertical-align: middle;
+            height: 45px; /* Fixed height for all rows */
+        }
+        
+        .table-contribution td, .table-contribution th {
+            padding: 8px;
+            vertical-align: middle;
+            height: 45px; /* Matching height with other tables */
+            text-align: center;
+        }
+        
+        /* Add spacing between tables */
+        .col-md-5 {
+            padding-right: 15px;
+        }
+        
+        .col-md-2 {
+            padding-left: 30px; /* Extra spacing before contribution table */
+        }
+        
+        /* Color all contribution values */
+        .table-contribution .percent-cell {
+            font-weight: bold;
+            padding: 8px;
+        }
+        
+        /* Ensure consistent row heights across all tables */
+        tr {
+            line-height: 29px; /* Adjust this value to match your needs */
+        }
+        
+        /* Make the contribution column more compact */
+        .table-contribution th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        /* Add subtle borders */
+        .table-bordered {
+            border: 1px solid #dee2e6;
+        }
+        
+        /* Add hover effect on rows */
+        .table-values tbody tr:hover {
+            background-color: rgba(0,0,0,.075);
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs" id="myTabs" role="tablist">
+            <!-- Column Mapping Tab -->
+            <li class="nav-item">
+                <a class="nav-link active" id="column-mapping-tab" data-toggle="tab" href="#column-mapping" role="tab">
+                    Column Mapping
+                </a>
+            </li>
+            <!-- SI Movement Tab -->
+            <li class="nav-item">
+                <a class="nav-link" id="si-movement-tab" data-toggle="tab" href="#si-movement" role="tab">
+                    SI Movement
+                </a>
+            </li>
+            <!-- Occupancy Movement Tab -->
+            <li class="nav-item">
+                <a class="nav-link" id="occupancy-movement-tab" data-toggle="tab" href="#occupancy-movement" role="tab">
+                    Occupancy
+                </a>
+            </li>
+            <!-- Geography Movement Tab -->
+            <li class="nav-item">
+                <a class="nav-link" id="geography-movement-tab" data-toggle="tab" href="#geography-movement" role="tab">
+                    Geography
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="construction-movement-tab" data-toggle="tab" href="#construction-movement" role="tab">
+                    Construction
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="building-height-movement-tab" data-toggle="tab" href="#building-height-movement" role="tab">
+                    Building Height
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="year-built-movement-tab" data-toggle="tab" href="#year-built-movement" role="tab">
+                    Year Built
+                </a>
+            </li>
+        </ul>
+
+        <!-- Tab Contents -->
+        <div class="tab-content" id="myTabContent">
+            <!-- Column Mapping Tab Content -->
+            <div class="tab-pane fade show active" id="column-mapping" role="tabpanel">
+                <!-- Column Mapping Form -->
+                <div class="mapping-section">
+                    <div class="currency-selector">
+                        <select id="currencySelector" onchange="updateCurrency()">
+                            <option value="EUR">EUR (€)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="GBP">GBP (£)</option>
+                            <option value="JPY">JPY (¥)</option>
+                        </select>
+                    </div>
+                    <h4>Map Columns</h4>
+                    <div class="row">
+                        <!-- Table 1 Mapping -->
+
+                        <div class="col-md-6">
+                            <h5>Table 1 Mapping</h5>
+                        
+                            
+                            <div class="form-group">
+                                <label for="table1-si-buildings">SI Buildings:</label>
+                                <select class="form-control" id="table1-si-buildings">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-si-contents">SI Contents:</label>
+                                <select class="form-control" id="table1-si-contents">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-si-bi">SI BI:</label>
+                                <select class="form-control" id="table1-si-bi">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-Occupancy">Occupancy:</label>
+                                <select class="form-control" id="table1-Occupancy">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-Geography">Geography:</label>
+                                <select class="form-control" id="table1-Geography">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-Construction">Construction:</label>
+                                <select class="form-control" id="table1-Construction">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-BuildingHeight">Building Height:</label>
+                                <select class="form-control" id="table1-BuildingHeight">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table1-YearBuilt">Year Built:</label>
+                                <select class="form-control" id="table1-YearBuilt">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <!-- Table 2 Mapping -->
+                        <div class="col-md-6">
+                            <h5>Table 2 Mapping</h5>
+                            
+                            <div class="form-group">
+                                <label for="table2-si-buildings">SI Buildings:</label>
+                                <select class="form-control" id="table2-si-buildings">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table2-si-contents">SI Contents:</label>
+                                <select class="form-control" id="table2-si-contents">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table2-si-bi">SI BI:</label>
+                                <select class="form-control" id="table2-si-bi">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table2-Occupancy">Occupancy:</label>
+                                <select class="form-control" id="table2-Occupancy">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names1 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table2-Geography">Geography:</label>
+                                <select class="form-control" id="table2-Geography">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>                            
+                            <div class="form-group">
+                                <label for="table2-Construction">Construction:</label>
+                                <select class="form-control" id="table2-Construction">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table2-BuildingHeight">Building Height:</label>
+                                <select class="form-control" id="table2-BuildingHeight">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="table2-YearBuilt">Year Built:</label>
+                                <select class="form-control" id="table2-YearBuilt">
+                                    <option value="">Select Column</option>
+                                    {% for column in column_names2 %}
+                                        <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <!-- Map Same Button -->
+                            <button class="btn btn-secondary mt-3" onclick="mapSame()">Map Same</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Save and Import Buttons -->
+                    <div class="mt-3">
+                        <div class="form-inline">
+                            <input type="text" id="mappingFileName" class="form-control mr-2" placeholder="Enter file name" style="max-width: 200px;">
+                            <button class="btn btn-primary mr-2" onclick="saveColumnMapping()">Save Column Mapping</button>
+                            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importColumnMapping(event)">
+                            <button class="btn btn-primary" onclick="document.getElementById('importFile').click()">Import Column Mapping</button>
+                            <!-- Proceed Button -->
+                            <button class="btn btn-success ml-2" onclick="proceedToSI()">Proceed</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+ <!-- SI Movement Tab Content -->
+<div class="tab-pane fade" id="si-movement" role="tabpanel">
+    <h4>SI Movement Analysis</h4>
+
+    <!-- SI Movement Results Table -->
+    <div id="results-section" class="d-none">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th class="table1-label">{{ table1_year }} Sum</th>
+                    <th class="table2-label">{{ table2_year }} Sum</th>
+                    <th>% Change</th>
+                    <th>Contribution</th>
+                </tr>
+            </thead>
+            <tbody id="results-body">
+                <!-- Rows will be dynamically populated -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Charts Section -->
+    <div id="charts-section" class="d-none">
+        <h4>Visual Representation</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="pieChart1"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="pieChart2"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary Section -->
+    <div id="si-ai-summary-section" class="d-none">
+        <h5>AI Analysis Summary</h5>
+        <div id="si-ai-summary" class="alert alert-info">
+            Click the button below to generate a summary of the differences.
+        </div>
+        <button class="btn btn-primary" onclick="generateAISummary('si')">Generate AI Summary</button>
+    </div>
+</div>
+
+
+<!-- Occupancy Movement Tab Content -->
+<div class="tab-pane fade" id="occupancy-movement" role="tabpanel">
+    <h4>Occupancy Movement Analysis</h4>
+    
+    <!-- New Table Layout -->
+    <div class="row mt-4">
+        <!-- Table 1 -->
+        <div class="col-md-5">
+            <h5>{{ table1_year }} Values</h5>
+            <div class="table-responsive mt-3">
+                <table class="table table-bordered table-values">
+                    <thead>
+                        <tr>
+                            <th>Occupancy Type</th>
+                            <th>Buildings</th>
+                            <th>Contents</th>
+                            <th>BI</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="occupancy-table1-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Table 2 -->
+        <div class="col-md-5">
+            <h5>{{ table2_year }} Values</h5>
+            <div class="table-responsive mt-3">
+                <table class="table table-bordered table-values">
+                    <thead>
+                        <tr>
+                            <th>Occupancy Type</th>
+                            <th>Buildings</th>
+                            <th>Contents</th>
+                            <th>BI</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="occupancy-table2-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- contribution/Contribution Table -->
+        <div class="col-md-2">
+            <h5>contribution</h5>
+            <div class="table-responsive mt-3">
+                <table class="table table-bordered table-contribution">
+                    <thead>
+                        <tr>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="occupancy-contribution-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Occupancy Charts Section -->
+    <div id="occupancy-charts-section" class="data-section">
+        <h4>Visual Representation</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="occupancyPieChart1"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="occupancyPieChart2"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary Section -->
+    <div id="occupancy-ai-summary-section" class="ai-summary-section">
+        <h5>AI Analysis Summary</h5>
+        <div id="occupancy-ai-summary" class="alert alert-info">
+            Click the button below to generate a summary of the differences.
+        </div>
+        <button class="btn btn-primary" onclick="generateAISummary('occupancy')">Generate AI Summary</button>
+    </div>
+</div>
+
+<!-- Geography Movement Tab Content -->
+<div class="tab-pane fade" id="geography-movement" role="tabpanel">
+    <h4>Geography Movement Analysis</h4>
+
+    <!-- Geography Charts Section -->
+    <div id="geography-charts-section" style="display: none;">
+        <div class="chart-wrapper-geography">
+            <canvas id="geographyChart1"></canvas>
+        </div>
+        <div class="chart-wrapper-geography">
+            <canvas id="geographyChart2"></canvas>
+        </div>
+        <div class="chart-wrapper-geography">
+            <canvas id="geographyChart3"></canvas>
+        </div>
+        <div class="chart-wrapper-geography">
+            <canvas id="geographyChart4"></canvas>
+        </div>
+
+    </div>
+
+    <!-- AI Summary Section for Geography Movement  -->
+    <div id="geography-ai-summary-section" style="display: none;">
+        <h5>AI Analysis Summary</h5>
+        <div id="geography-ai-summary" class="alert alert-info">
+            Click the button below to generate a summary of the differences.
+        </div>
+        <button class="btn btn-primary" onclick="generateAISummary('geography')">Generate AI Summary</button>
+    </div>
+</div>
+
+<div class="tab-pane fade" id="construction-movement" role="tabpanel">
+    <h4>Construction Movement Analysis</h4>
+
+    <!-- Construction Results Section -->
+    <div id="construction-results-section" style="display: none;">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Construction Type</th>
+                    <th class="table1-label">{{ table1_year }} Sum</th>
+                    <th class="table2-label">{{ table2_year }} Sum</th>
+                    <th>% Change</th>
+                    <th>Contribution</th>
+                </tr>
+            </thead>
+            <tbody id="construction-results-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Construction Charts Section -->
+    <div id="construction-charts-section" class="data-section" style="display: none;">
+        <h4>Visual Representation</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="constructionPieChart1"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="constructionPieChart2"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary Section for Construction Movement -->
+    <div id="construction-ai-summary-section" style="display: none;">
+        <h5>AI Analysis Summary</h5>
+        <div id="construction-ai-summary" class="alert alert-info">
+            Click the button below to generate a summary of the differences.
+        </div>
+        <button class="btn btn-primary" onclick="generateAISummary('construction')">Generate AI Summary</button>
+    </div>
+</div>
+
+<!-- Building Height Tab Content -->
+<div class="tab-pane fade" id="building-height-movement" role="tabpanel">
+    <h4>Building Height Movement Analysis</h4>
+
+    <!-- Building Height Results Section -->
+    <div id="building-height-results-section" style="display: none;">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Building Height</th>
+                    <th class="table1-label">{{ table1_year }} Sum</th>
+                    <th class="table2-label">{{ table2_year }} Sum</th>
+                    <th>% Change</th>
+                    <th>Contribution</th>
+                </tr>
+            </thead>
+            <tbody id="building-height-results-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Building Height Charts Section -->
+    <div id="building-height-charts-section" class="data-section" style="display: none;">
+        <h4>Visual Representation</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="buildingHeightPieChart1"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="buildingHeightPieChart2"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary Section -->
+    <div id="building-height-ai-summary-section" style="display: none;">
+        <h5>AI Analysis Summary</h5>
+        <div id="building-height-ai-summary" class="alert alert-info">
+            Click the button below to generate a summary of the differences.
+        </div>
+        <button class="btn btn-primary" onclick="generateAISummary('building-height')">Generate AI Summary</button>
+    </div>
+</div>
+
+<!-- Year Built Tab Content -->
+<div class="tab-pane fade" id="year-built-movement" role="tabpanel">
+    <h4>Year Built Movement Analysis</h4>
+
+    <!-- Year Built Results Section -->
+    <div id="year-built-results-section" style="display: none;">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Year Built</th>
+                    <th class="table1-label">{{ table1_year }} Sum</th>
+                    <th class="table2-label">{{ table2_year }} Sum</th>
+                    <th>% Change</th>
+                    <th>Contribution</th>
+                </tr>
+            </thead>
+            <tbody id="year-built-results-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Year Built Charts Section -->
+    <div id="year-built-charts-section" class="data-section" style="display: none;">
+        <h4>Visual Representation</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="yearBuiltPieChart1"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-wrapper">
+                    <canvas id="yearBuiltPieChart2"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary Section -->
+    <div id="year-built-ai-summary-section" style="display: none;">
+        <h5>AI Analysis Summary</h5>
+        <div id="year-built-ai-summary" class="alert alert-info">
+            Click the button below to generate a summary of the differences.
+        </div>
+        <button class="btn btn-primary" onclick="generateAISummary('year-built')">Generate AI Summary</button>
+    </div>
+</div>
+
+
+    <!-- Include jQuery and Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- Ensure jQuery is loaded before Bootstrap JS -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script>
+        
+        // Declare variables
+        let proceedClicked = false;
+        let calculationsDone = false;
+        let occupancyCalculationsDone = false;
+        let geographyCalculationsDone = false;
+        let constructionCalculationsDone = false;
+        let buildingHeightCalculationsDone = false;
+        let yearBuiltCalculationsDone = false;
+
+
+        let pieChart1Instance;
+        let pieChart2Instance;
+        let occupancyPieChart1Instance
+        let occupancyPieChart2Instance
+        let selectedCurrency = 'EUR';
+        const currencySymbols = {
+            'EUR': '€',
+            'USD': '$',
+            'GBP': '£',
+            'JPY': '¥'
+        };
+
+        let siData = null;
+        let occupancyData = null;
+        let geographyData = null;
+        let constructionData = null;
+        let geographyCharts = [];
+        let constructionPieChart1Instance;
+        let constructionPieChart2Instance;
+        let buildingHeightPieChart1Instance;
+        let buildingHeightPieChart2Instance;
+        let yearBuiltPieChart1Instance;
+        let yearBuiltPieChart2Instance;
+
+        // map the same columns in Table 2 based on Table 1 selections
+        function mapSame() {
+            const mappings = [
+    {table1: 'table1-si-buildings', table2: 'table2-si-buildings'},
+    {table1: 'table1-si-contents', table2: 'table2-si-contents'},
+    {table1: 'table1-si-bi', table2: 'table2-si-bi'},
+    {table1: 'table1-Occupancy', table2: 'table2-Occupancy'},
+    {table1: 'table1-Geography', table2: 'table2-Geography'},
+    {table1: 'table1-Construction', table2: 'table2-Construction'},
+    {table1: 'table1-BuildingHeight', table2: 'table2-BuildingHeight'},
+    {table1: 'table1-YearBuilt', table2: 'table2-YearBuilt'}   
+];
+
+            mappings.forEach(mapping => {
+                const selectedColumn = document.getElementById(mapping.table1).value;
+                const table2Dropdown = document.getElementById(mapping.table2);
+                let found = false;
+
+                for (let option of table2Dropdown.options) {
+                    if (option.value === selectedColumn) {
+                        table2Dropdown.value = selectedColumn;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    table2Dropdown.value = ""; // Leave it empty if no match found
+                }
+            });
+        }
+
+        // Save Column Mapping
+        function saveColumnMapping() {
+            // Get the file name from the input field
+            let fileName = document.getElementById('mappingFileName').value.trim();
+            if (!fileName) {
+                alert('Please enter a file name.');
+                return;
+            }
+            // Ensure the file name has a .json extension
+            if (!fileName.endsWith('.json')) {
+                fileName += '.json';
+            }
+
+            // Collect mappings
+            const mappings = {
+                table1: {
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value,
+                    occupancy: document.getElementById('table1-Occupancy').value,
+                    geography: document.getElementById('table1-Geography').value,
+                    construction: document.getElementById('table1-Construction').value,
+                    buildingHeight: document.getElementById('table1-BuildingHeight').value,
+                    yearBuilt: document.getElementById('table1-YearBuilt').value
+                },
+                table2: {
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value,
+                    occupancy: document.getElementById('table2-Occupancy').value,
+                    geography: document.getElementById('table2-Geography').value,
+                    construction: document.getElementById('table2-Construction').value,
+                    buildingHeight: document.getElementById('table2-BuildingHeight').value,
+                    yearBuilt: document.getElementById('table2-YearBuilt').value
+                }
+            };
+            // Convert to JSON and trigger download
+            const jsonStr = JSON.stringify(mappings, null, 4);
+            const blob = new Blob([jsonStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName; // Use the specified file name
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Import Column Mapping
+        function importColumnMapping(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const mappings = JSON.parse(e.target.result);
+                        // Validate and apply mappings
+                        applyColumnMappings(mappings);
+                        alert('Column mappings imported successfully.');
+                    } catch (err) {
+                        alert('Invalid JSON file.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function applyColumnMappings(mappings) {
+            // Apply mappings to the form inputs
+            document.getElementById('table1-si-buildings').value = mappings.table1.buildings || '';
+            document.getElementById('table1-si-contents').value = mappings.table1.contents || '';
+            document.getElementById('table1-si-bi').value = mappings.table1.bi || '';
+            document.getElementById('table1-Occupancy').value = mappings.table1.occupancy || '';
+            document.getElementById('table1-Geography').value = mappings.table1.geography || '';
+            document.getElementById('table1-Construction').value = mappings.table1.construction || '';
+            document.getElementById('table1-BuildingHeight').value = mappings.table1.buildingHeight || '';
+            document.getElementById('table1-YearBuilt').value = mappings.table1.yearBuilt || '';
+
+            document.getElementById('table2-si-buildings').value = mappings.table2.buildings || '';
+            document.getElementById('table2-si-contents').value = mappings.table2.contents || '';
+            document.getElementById('table2-si-bi').value = mappings.table2.bi || '';
+            document.getElementById('table2-Occupancy').value = mappings.table2.occupancy || '';
+            document.getElementById('table2-Geography').value = mappings.table2.geography || '';
+            document.getElementById('table2-Construction').value = mappings.table2.construction || '';
+            document.getElementById('table2-BuildingHeight').value = mappings.table2.buildingHeight || '';
+            document.getElementById('table2-YearBuilt').value = mappings.table2.yearBuilt || '';
+
+        }
+
+        // Proceed to SI Movement Tab
+        function proceedToSI() {
+            proceedClicked = true;
+            calculationsDone = false; // Reset all calculationsDone - helps to manage space
+            occupancyCalculationsDone = false;
+            geographyCalculationsDone = false; 
+            constructionCalculationsDone = false;
+            // Validate the column mappings before proceeding.
+            const requiredFields = [
+                'table1-si-buildings',
+                'table1-si-contents',
+                'table1-si-bi',
+                'table1-Occupancy',
+                'table1-Geography',
+                'table2-si-buildings',
+                'table2-si-contents',
+                'table2-si-bi',
+                'table2-Occupancy',
+                'table2-Geography'
+            ];
+            let allFieldsFilled = true;
+            requiredFields.forEach(id => {
+                if (!document.getElementById(id).value) {
+                    allFieldsFilled = false;
+                }
+            });
+            if (!allFieldsFilled) {
+                alert('Please complete all column mappings before proceeding.');
+                return;
+            }
+
+            // Activate the SI Movement tab
+            $('#si-movement-tab').tab('show');
+        }
+
+        $(document).ready(function() {
+            $('a[data-toggle="tab"]').on('shown.bs.tab', async function (e) {
+                const target = $(e.target).attr("href"); // activated tab
+        
+                if (target === '#si-movement' && proceedClicked) {
+                    if (!calculationsDone) {
+                        await calculateSI();
+                    }
+                } else if (target === '#occupancy-movement' && proceedClicked) {
+                    if (!occupancyCalculationsDone) {
+                        await calculateOccupancy();
+                    }
+                } else if (target === '#geography-movement' && proceedClicked) {
+                    if (!geographyCalculationsDone) {
+                        setTimeout(() => calculateGeography(), 0);
+                        geographyCalculationsDone = true;
+                    }
+                } else if (target === '#construction-movement' && proceedClicked) {
+                    if (!constructionCalculationsDone) {
+                        await calculateConstruction();
+                        constructionCalculationsDone = true; // Ensure it runs only once
+                    }
+                } else if (target === '#building-height-movement' && proceedClicked) {
+                    if (!buildingHeightCalculationsDone) {
+                        await calculateBuildingHeight();
+                        buildingHeightCalculationsDone = true;
+                    }
+                } else if (target === '#year-built-movement' && proceedClicked) {
+                    if (!yearBuiltCalculationsDone) {
+                        await calculateYearBuilt();
+                        yearBuiltCalculationsDone = true;
+                    }
+                }
+            });
+        });
+
+        //  calculate SI Movement
+        function calculateSI() {
+            const mappings = {
+                table1: {
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value
+                },
+                table2: {
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value
+                }
+            };
+
+            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            fetch('/calculate_si/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(mappings)
+            })
+            .then(response => !response.ok ? response.json().then(err => Promise.reject(err)) : response.json())
+            .then(data => {
+                displayResults(data);
+                calculationsDone = true;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error calculating SI values: ' + (error.error || error.message || 'Unknown error'));
+            });
+        }
+
+        //  display results
+        function displayResults(data) {
+            const categories = ["buildings", "contents", "bi", "total"];
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = categories.map(category => `
+                <tr id="si-${category}-row" ${category === 'total' ? 'class="font-weight-bold"' : ''}>
+                    <td><strong>SI ${category.charAt(0).toUpperCase() + category.slice(1)}</strong></td>
+                    <td class="number-cell">${formatCurrency(data.Table1[category] || 0)}</td>
+                    <td class="number-cell">${formatCurrency(data.Table2[category] || 0)}</td>
+                    <td class="percent-cell ${data.Changes[category] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.Changes[category] !== null ? data.Changes[category].toFixed(2) + '%' : 'N/A'}
+                    </td>
+                    <td class="percent-cell ${data.Contribution[category] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.Contribution[category] !== null ? data.Contribution[category].toFixed(2) + '%' : 'N/A'}
+                    </td>
+                </tr>
+            `).join('');
+        
+            document.getElementById('results-section').classList.remove('d-none');
+            generateCharts(data);
+        }
+        
+        //  generate charts
+        function generateCharts(data) {
+            document.getElementById('charts-section').classList.remove('d-none');
+        
+            // Destroy previous charts
+            if (pieChart1Instance) pieChart1Instance.destroy();
+            if (pieChart2Instance) pieChart2Instance.destroy();
+        
+            const years = {
+                year1: document.querySelector('.table1-label').textContent.split(' ')[0],
+                year2: document.querySelector('.table2-label').textContent.split(' ')[0]
+            };
+        
+            const dataset1 = [
+                parseFloat(data.Table1["buildings"]) || 0,
+                parseFloat(data.Table1["contents"]) || 0,
+                parseFloat(data.Table1["bi"]) || 0
+            ];
+            
+            const dataset2 = [
+                parseFloat(data.Table2["buildings"]) || 0,
+                parseFloat(data.Table2["contents"]) || 0,
+                parseFloat(data.Table2["bi"]) || 0
+            ];
+        
+            createDistributionPieCharts(data, {
+                chartInstance1: 'pieChart1Instance',
+                chartInstance2: 'pieChart2Instance',
+                canvas1Id: 'pieChart1',
+                canvas2Id: 'pieChart2',
+                labels: ['SI Buildings', 'SI Contents', 'SI BI'],
+                dataset1: dataset1,
+                dataset2: dataset2,
+                title1: `SI Distribution ${years.year1}`,
+                title2: `SI Distribution ${years.year2}`
+            });
+        
+            document.getElementById('si-ai-summary-section').classList.remove('d-none');
+        }
+        
+        //  calculate Occupancy Movement
+        function calculateOccupancy() {
+            const mappings = {
+                table1: {
+                    occupancy: document.getElementById('table1-Occupancy').value,
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value
+                },
+                table2: {
+                    occupancy: document.getElementById('table2-Occupancy').value,
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value
+                }
+            };
+
+            fetch('/calculate_occupancy/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                },
+                body: JSON.stringify(mappings)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'An error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayOccupancyResults(data);
+                occupancyCalculationsDone = true;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error calculating Occupancy values: ' + error.message);
+            });
+            
+        }
+
+        function displayOccupancyResults(data) {
+            occupancyData = data;
+            
+            document.getElementById('occupancy-charts-section').style.display = 'block';
+            document.getElementById('occupancy-ai-summary-section').style.display = 'block';
+
+            let allOccupancies = [...new Set([...Object.keys(data.table1), ...Object.keys(data.table2)])];
+            
+            // Remove Total from the list as we'll calculate it separately --importtant!
+            allOccupancies = allOccupancies.filter(type => type !== 'Total').sort();
+
+            function createTableRows(data, bodyId, valueType) {
+                const tbody = document.getElementById(bodyId);
+                tbody.innerHTML = '';
+                
+                if (valueType === 'contribution') {
+                    allOccupancies.forEach(occupancyType => {
+                        const contribution = data.contributions[occupancyType];
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="percent-cell ${contribution >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                                ${contribution.toFixed(2)}%
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+
+                    // Add total contribution row
+                    const row = document.createElement('tr');
+                    row.classList.add('font-weight-bold');
+                    row.innerHTML = `
+                        <td class="percent-cell">
+                            ${data.contributions['Total'].toFixed(2)}%
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                } else {
+                    // For value tables
+                    allOccupancies.forEach(occupancyType => {
+                        const values = data[valueType][occupancyType] || {};
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td><strong>${occupancyType}</strong></td>
+                            <td class="number-cell">${formatCurrency(values.buildings || 0)}</td>
+                            <td class="number-cell">${formatCurrency(values.contents || 0)}</td>
+                            <td class="number-cell">${formatCurrency(values.bi || 0)}</td>
+                            <td class="number-cell">${formatCurrency(values.total || 0)}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+
+                    // Add total row
+                    const totalValues = data[valueType]['Total'];
+                    const totalRow = document.createElement('tr');
+                    totalRow.classList.add('font-weight-bold');
+                    totalRow.innerHTML = `
+                        <td><strong>Total</strong></td>
+                        <td class="number-cell">${formatCurrency(totalValues.buildings)}</td>
+                        <td class="number-cell">${formatCurrency(totalValues.contents)}</td>
+                        <td class="number-cell">${formatCurrency(totalValues.bi)}</td>
+                        <td class="number-cell">${formatCurrency(totalValues.total)}</td>
+                    `;
+                    tbody.appendChild(totalRow);
+                }
+            }
+
+            // Populate al tables
+            createTableRows(data, 'occupancy-table1-body', 'table1');
+            createTableRows(data, 'occupancy-table2-body', 'table2');
+            createTableRows(data, 'occupancy-contribution-body', 'contribution');
+
+            // Generate pie charts
+            generateOccupancyCharts(data);
+        }
+                        
+        function generateOccupancyCharts(data) {
+                if (occupancyPieChart1Instance) occupancyPieChart1Instance.destroy();
+                if (occupancyPieChart2Instance) occupancyPieChart2Instance.destroy();
+            
+                // Remove "Total" from chart data
+                const allOccupancies = [...new Set([...Object.keys(data.table1), ...Object.keys(data.table2)])];
+                const occupanciesForChart = allOccupancies.filter(type => type !== "Total"); //exclude Total row
+            
+                const years = {
+                    year1: document.querySelector('.table1-label').textContent.split(' ')[0],
+                    year2: document.querySelector('.table2-label').textContent.split(' ')[0]
+                };
+            
+                createDistributionPieCharts(data, {
+                    chartInstance1: 'occupancyPieChart1Instance',
+                    chartInstance2: 'occupancyPieChart2Instance',
+                    canvas1Id: 'occupancyPieChart1',
+                    canvas2Id: 'occupancyPieChart2',
+                    labels: occupanciesForChart, 
+                    dataset1: occupanciesForChart.map(type => data.table1[type]?.total || 0), // Exclude "Total" data
+                    dataset2: occupanciesForChart.map(type => data.table2[type]?.total || 0), // Exclude "Total" data
+                    title1: `Occupancy Distribution ${years.year1}`,
+                    title2: `Occupancy Distribution ${years.year2}`
+                });
+            }
+
+        //  calculate Geography data
+        function calculateGeography() {
+            const mappings = {
+                table1: {
+                    geography: document.getElementById('table1-Geography').value,
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value,
+                },
+                table2: {
+                    geography: document.getElementById('table2-Geography').value,
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value,
+                }
+            };
+        
+            // Get CSRF token
+            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        
+            fetch('/calculate_geography/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(mappings)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'An error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayGeographyCharts(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error calculating Geography values: ' + error.message);
+            });
+        }
+        
+        //  display bar charts for Geography
+        function displayGeographyCharts(data) {
+            geographyData = data;
+            
+            document.getElementById('geography-charts-section').style.display = 'block';
+            document.getElementById('geography-ai-summary-section').style.display = 'block';
+
+            // Clear existing charts
+            geographyCharts.forEach(chart => chart.destroy());
+            geographyCharts = [];
+
+            const geographyLabels = Object.keys(data.table1);
+            const table1Data = Object.values(data.table1);
+            const table2Data = Object.values(data.table2);
+            const differences = table2Data.map((value, index) => value - table1Data[index]);
+            const contributionData = Object.values(data.contributions);
+
+            // Create the four charts with their configs
+            createBarChart('geographyChart1', {
+                labels: geographyLabels,
+                data: table1Data,
+                label: `Geography Distribution for ${data.year1}`,
+                title: `Geography Distribution ${data.year1}`,
+                chartCollection: geographyCharts
+            });
+
+            createBarChart('geographyChart2', {
+                labels: geographyLabels,
+                data: table2Data,
+                label: `Geography Distribution for ${data.year2}`,
+                title: `Geography Distribution ${data.year2}`,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                chartCollection: geographyCharts
+            });
+
+            createBarChart('geographyChart3', {
+                labels: geographyLabels,
+                data: differences,
+                label: 'Difference (Year 2 - Year 1)',
+                title: 'Differences in Geography Distribution (Year 2 - Year 1)',
+                getBackgroundColor: (data) => data.map(value => 
+                    value >= 0 ? 'rgba(0, 200, 0, 0.6)' : 'rgba(255, 99, 132, 0.6)'
+                ),
+                chartCollection: geographyCharts
+            });
+
+            createBarChart('geographyChart4', {
+                labels: geographyLabels,
+                data: contributionData,
+                label: 'Contribution',
+                title: 'Contribution',
+                getBackgroundColor: (data) => data.map(value => 
+                    value >= 0 ? 'rgba(0, 200, 0, 0.6)' : 'rgba(255, 99, 132, 0.6)'
+                ),
+                formatLabel: (context) => `${context.label}: ${context.raw.toFixed(2)}%`,
+                formatYAxis: value => `${value.toFixed(2)}%`,
+                chartCollection: geographyCharts
+            });
+
+            showAISummary('geography');
+        }
+
+     
+
+        function calculateConstruction() {
+            console.log("calculateConstruction() called");
+            const mappings = {
+                table1: {
+                    construction: document.getElementById('table1-Construction').value,
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value
+                },
+                table2: {
+                    construction: document.getElementById('table2-Construction').value,
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value
+                }
+            };
+
+            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            fetch('/calculate_construction/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(mappings)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'An error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayConstructionResults(data);
+                constructionCalculationsDone = true;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error calculating Construction values: ' + error.message);
+            });
+        }
+
+        function displayConstructionResults(data) {
+            constructionData = data; // Store for AI summary
+            
+            // Show relevant sections
+            document.getElementById('construction-results-section').style.display = 'block';
+            document.getElementById('construction-charts-section').style.display = 'block';
+            document.getElementById('construction-ai-summary-section').style.display = 'block';
+
+            // Display results table
+            const tbody = document.getElementById('construction-results-body');
+            tbody.innerHTML = '';
+
+            // Get all unique construction types
+            const allConstructions = [...new Set([...Object.keys(data.table1), ...Object.keys(data.table2)])].sort();
+
+            // Create rows for each construction type
+            allConstructions.forEach(constructionType => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${constructionType}</strong></td>
+                    <td class="number-cell">${formatCurrency(data.table1[constructionType]?.total || 0)}</td>
+                    <td class="number-cell">${formatCurrency(data.table2[constructionType]?.total || 0)}</td>
+                    <td class="percent-cell ${data.percent_changes[constructionType]?.total >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.percent_changes[constructionType]?.total !== null ? data.percent_changes[constructionType].total.toFixed(2) + '%' : 'N/A'}
+                    </td>
+                    <td class="percent-cell ${data.contributions[constructionType] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.contributions[constructionType].toFixed(2)}%
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Calculate and add total row
+            const totals = {
+                table1: Object.values(data.table1).reduce((sum, curr) => sum + (curr.total || 0), 0),
+                table2: Object.values(data.table2).reduce((sum, curr) => sum + (curr.total || 0), 0)
+            };
+            const totalPercentChange = totals.table1 !== 0 ? ((totals.table2 - totals.table1) / totals.table1) * 100 : null;
+
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'font-weight-bold';
+            totalRow.innerHTML = `
+                <td>Total</td>
+                <td class="number-cell">${formatCurrency(totals.table1)}</td>
+                <td class="number-cell">${formatCurrency(totals.table2)}</td>
+                <td class="percent-cell ${data.contributions['Total'] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                    ${data.contributions['Total'].toFixed(2)}%
+                </td>
+                <td class="percent-cell ${data.contributions['Total'] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                    ${data.contributions['Total'].toFixed(2)}%
+                </td>
+            `;
+            tbody.appendChild(totalRow);
+
+            // Generate charts
+            if (constructionPieChart1Instance) constructionPieChart1Instance.destroy();
+            if (constructionPieChart2Instance) constructionPieChart2Instance.destroy();
+
+            const years = {
+                year1: document.querySelector('.table1-label').textContent.split(' ')[0],
+                year2: document.querySelector('.table2-label').textContent.split(' ')[0]
+            };
+
+            createDistributionPieCharts(data, {
+                chartInstance1: 'constructionPieChart1Instance',
+                chartInstance2: 'constructionPieChart2Instance',
+                canvas1Id: 'constructionPieChart1',
+                canvas2Id: 'constructionPieChart2',
+                labels: allConstructions,
+                dataset1: allConstructions.map(type => data.table1[type]?.total || 0),
+                dataset2: allConstructions.map(type => data.table2[type]?.total || 0),
+                title1: `Construction Distribution ${years.year1}`,
+                title2: `Construction Distribution ${years.year2}`
+            });
+
+            showAISummary('construction');
+        }            
+
+         // Add Building Height calculation functions
+         function calculateBuildingHeight() {
+            console.log("calculateBuildingHeight() called");
+            const mappings = {
+                table1: {
+                    buildingHeight: document.getElementById('table1-BuildingHeight').value,
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value
+                },
+                table2: {
+                    buildingHeight: document.getElementById('table2-BuildingHeight').value,
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value
+                }
+            };
+
+            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            return fetch('/calculate_building_height/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(mappings)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'An error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayBuildingHeightResults(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error calculating Building Height values: ' + error.message);
+            });
+        }
+
+        function displayBuildingHeightResults(data) {
+            buildingHeightData = data;
+            
+            // Show relevant sections
+            document.getElementById('building-height-results-section').style.display = 'block';
+            document.getElementById('building-height-charts-section').style.display = 'block';
+            document.getElementById('building-height-ai-summary-section').style.display = 'block';
+
+            // Display results table
+            const tbody = document.getElementById('building-height-results-body');
+            tbody.innerHTML = '';
+
+            // Get all unique building heights
+            const allBuildingHeights = [...new Set([...Object.keys(data.table1), ...Object.keys(data.table2)])].sort();
+
+            // Create rows for each building height
+            allBuildingHeights.forEach(heightType => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${heightType}</strong></td>
+                    <td class="number-cell">${formatCurrency(data.table1[heightType]?.total || 0)}</td>
+                    <td class="number-cell">${formatCurrency(data.table2[heightType]?.total || 0)}</td>
+                    <td class="percent-cell ${data.percent_changes[heightType]?.total >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.percent_changes[heightType]?.total !== null ? data.percent_changes[heightType].total.toFixed(2) + '%' : 'N/A'}
+                    </td>
+                    <td class="percent-cell ${data.contributions[heightType] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.contributions[heightType].toFixed(2)}%
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Add total row
+            const totals = {
+                table1: Object.values(data.table1).reduce((sum, curr) => sum + (curr.total || 0), 0),
+                table2: Object.values(data.table2).reduce((sum, curr) => sum + (curr.total || 0), 0)
+            };
+
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'font-weight-bold';
+            totalRow.innerHTML = `
+                <td>Total</td>
+                <td class="number-cell">${formatCurrency(totals.table1)}</td>
+                <td class="number-cell">${formatCurrency(totals.table2)}</td>
+                <td class="percent-cell ${data.contributions['Total'] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                    ${data.contributions['Total'].toFixed(2)}%
+                </td>
+                <td class="percent-cell ${data.contributions['Total'] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                    ${data.contributions['Total'].toFixed(2)}%
+                </td>
+            `;
+            tbody.appendChild(totalRow);
+
+            // Generate charts
+            if (buildingHeightPieChart1Instance) buildingHeightPieChart1Instance.destroy();
+            if (buildingHeightPieChart2Instance) buildingHeightPieChart2Instance.destroy();
+
+            const years = {
+                year1: document.querySelector('.table1-label').textContent.split(' ')[0],
+                year2: document.querySelector('.table2-label').textContent.split(' ')[0]
+            };
+
+            createDistributionPieCharts(data, {
+                chartInstance1: 'buildingHeightPieChart1Instance',
+                chartInstance2: 'buildingHeightPieChart2Instance',
+                canvas1Id: 'buildingHeightPieChart1',
+                canvas2Id: 'buildingHeightPieChart2',
+                labels: allBuildingHeights,
+                dataset1: allBuildingHeights.map(type => data.table1[type]?.total || 0),
+                dataset2: allBuildingHeights.map(type => data.table2[type]?.total || 0),
+                title1: `Building Height Distribution ${years.year1}`,
+                title2: `Building Height Distribution ${years.year2}`
+            });
+
+            showAISummary('building-height');
+        }
+
+        // Add Year Built calculation functions
+        function calculateYearBuilt() {
+            console.log("calculateYearBuilt() called");
+            const mappings = {
+                table1: {
+                    yearBuilt: document.getElementById('table1-YearBuilt').value,
+                    buildings: document.getElementById('table1-si-buildings').value,
+                    contents: document.getElementById('table1-si-contents').value,
+                    bi: document.getElementById('table1-si-bi').value
+                },
+                table2: {
+                    yearBuilt: document.getElementById('table2-YearBuilt').value,
+                    buildings: document.getElementById('table2-si-buildings').value,
+                    contents: document.getElementById('table2-si-contents').value,
+                    bi: document.getElementById('table2-si-bi').value
+                }
+            };
+
+            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            return fetch('/calculate_year_built/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(mappings)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'An error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                displayYearBuiltResults(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error calculating Year Built values: ' + error.message);
+            });
+        }
+
+        function displayYearBuiltResults(data) {
+            yearBuiltData = data;
+            
+            // Show relevant sections
+            document.getElementById('year-built-results-section').style.display = 'block';
+            document.getElementById('year-built-charts-section').style.display = 'block';
+            document.getElementById('year-built-ai-summary-section').style.display = 'block';
+
+            // Display results table
+            const tbody = document.getElementById('year-built-results-body');
+            tbody.innerHTML = '';
+
+            // Get all unique years
+            const allYears = [...new Set([...Object.keys(data.table1), ...Object.keys(data.table2)])].sort();
+
+            // Create rows for each year
+            allYears.forEach(year => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${year}</strong></td>
+                    <td class="number-cell">${formatCurrency(data.table1[year]?.total || 0)}</td>
+                    <td class="number-cell">${formatCurrency(data.table2[year]?.total || 0)}</td>
+                    <td class="percent-cell ${data.percent_changes[year]?.total >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.percent_changes[year]?.total !== null ? data.percent_changes[year].total.toFixed(2) + '%' : 'N/A'}
+                    </td>
+                    <td class="percent-cell ${data.contributions[year] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                        ${data.contributions[year].toFixed(2)}%
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Add total row
+            const totals = {
+                table1: Object.values(data.table1).reduce((sum, curr) => sum + (curr.total || 0), 0),
+                table2: Object.values(data.table2).reduce((sum, curr) => sum + (curr.total || 0), 0)
+            };
+
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'font-weight-bold';
+            totalRow.innerHTML = `
+                <td>Total</td>
+                <td class="number-cell">${formatCurrency(totals.table1)}</td>
+                <td class="number-cell">${formatCurrency(totals.table2)}</td>
+                <td class="percent-cell ${data.contributions['Total'] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                    ${data.contributions['Total'].toFixed(2)}%
+                </td>
+                <td class="percent-cell ${data.contributions['Total'] >= 0 ? 'percent-change-positive' : 'percent-change-negative'}">
+                    ${data.contributions['Total'].toFixed(2)}%
+                </td>
+            `;
+            tbody.appendChild(totalRow);
+
+            // Generate charts
+            if (yearBuiltPieChart1Instance) yearBuiltPieChart1Instance.destroy();
+            if (yearBuiltPieChart2Instance) yearBuiltPieChart2Instance.destroy();
+
+            const years = {
+                year1: document.querySelector('.table1-label').textContent.split(' ')[0],
+                year2: document.querySelector('.table2-label').textContent.split(' ')[0]
+            };
+
+            createDistributionPieCharts(data, {
+                chartInstance1: 'yearBuiltPieChart1Instance',
+                chartInstance2: 'yearBuiltPieChart2Instance',
+                canvas1Id: 'yearBuiltPieChart1',
+                canvas2Id: 'yearBuiltPieChart2',
+                labels: allYears,
+                dataset1: allYears.map(year => data.table1[year]?.total || 0),
+                dataset2: allYears.map(year => data.table2[year]?.total || 0),
+                title1: `Year Built Distribution ${years.year1}`,
+                title2: `Year Built Distribution ${years.year2}`
+            });
+
+            showAISummary('year-built');
+        }
+
+        //  generate AI summary for the  tab
+        function generateAISummary(tab) {
+            let data;
+            let summaryElementId;
+
+            if (tab === 'si' && siData) {
+                data = {
+                    table1: {
+                        buildings: siData.table1_buildings,
+                        contents: siData.table1_contents,
+                        bi: siData.table1_bi,
+                    },
+                    table2: {
+                        buildings: siData.table2_buildings,
+                        contents: siData.table2_contents,
+                        bi: siData.table2_bi,
+                    }
+                };
+                summaryElementId = 'si-ai-summary';
+            } else if (tab === 'occupancy' && occupancyData) {
+                data = {
+                    table1: occupancyData.table1,
+                    table2: occupancyData.table2,
+                    percent_changes: occupancyData.percent_changes
+                };
+                summaryElementId = 'occupancy-ai-summary';
+            } else if (tab === 'geography' && geographyData) {
+                data = {
+                    table1: geographyData.table1,
+                    table2: geographyData.table2,
+                    year1: geographyData.year1,
+                    year2: geographyData.year2
+                };
+                summaryElementId = 'geography-ai-summary';
+            } else if (tab === 'construction' && constructionData) {
+                data = {
+                    table1: constructionData.table1,
+                    table2: constructionData.table2,
+                    percent_changes: constructionData.percent_changes
+                };
+                summaryElementId = 'construction-ai-summary';
+            } else {
+                alert('No data available for AI summary. Please ensure calculations are completed first.');
+                return;
+            }
+
+            // Display loading message
+            document.getElementById(summaryElementId).textContent = 'Generating AI summary...';
+
+            // Get CSRF token
+            const csrftoken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            // Send the data to the AI backend
+            fetch('/ai_summary/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify({ data, tab })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'An error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(result => {
+                const summaryText = result.summary || 'Could not generate a summary. Please try again.';
+                document.getElementById(summaryElementId).textContent = summaryText;
+            })
+            .catch(error => {
+                console.error('Error generating AI summary:', error);
+                document.getElementById(summaryElementId).textContent = 
+                    'An error occurred while generating the summary: ' + error.message;
+            });
+        }
+            
+        function showAISummary(tab) {
+            if (tab === 'si') {
+                // Display SI AI Summary section only after tables and charts are shown
+                if (document.getElementById('results-section').style.display !== 'none' &&
+                    document.getElementById('charts-section').style.display !== 'none') {
+                    document.getElementById('si-ai-summary-section').style.display = 'block';
+                }
+            } else if (tab === 'occupancy') {
+                if (document.getElementById('occupancy-results-section').style.display !== 'none') {
+                    document.getElementById('occupancy-ai-summary-section').style.display = 'block';
+                }
+            } else if (tab === 'geography') {
+                if (document.getElementById('geography-charts-section').style.display !== 'none') {
+                    document.getElementById('geography-ai-summary-section').style.display = 'block';
+                }
+            } else if (tab === 'construction') {
+                if (document.getElementById('construction-results-section').style.display !== 'none') {
+                    document.getElementById('construction-ai-summary-section').style.display = 'block';
+                }
+            }
+        }
+
+        function updateCurrency() {
+            selectedCurrency = document.getElementById('currencySelector').value;
+            document.querySelectorAll('.table1-label').forEach(label => {
+                const year = label.textContent.split(' ')[0];
+                label.textContent = `${year} Sum (${currencySymbols[selectedCurrency]})`;
+            });
+            document.querySelectorAll('.table2-label').forEach(label => {
+                const year = label.textContent.split(' ')[0];
+                label.textContent = `${year} Sum (${currencySymbols[selectedCurrency]})`;
+            });
+            
+            // Refresh calculations 
+            if (calculationsDone) calculateSI();
+            if (occupancyCalculationsDone) calculateOccupancy();
+            if (geographyCalculationsDone) calculateGeography();
+            if (constructionCalculationsDone) calculateConstruction();
+        }
+
+        function formatCurrency(value) {
+            return value.toLocaleString('en-US', {
+                style: 'currency',
+                currency: selectedCurrency,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function createDistributionPieCharts(data, options) {
+            const {
+                chartInstance1,
+                chartInstance2,
+                canvas1Id,
+                canvas2Id,
+                labels,
+                dataset1,
+                dataset2,
+                title1,
+                title2
+            } = options;
+
+            // Clear existing charts
+            if (window[chartInstance1]) window[chartInstance1].destroy();
+            if (window[chartInstance2]) window[chartInstance2].destroy();
+
+            const chartColors = Array.from({ length: labels.length }, (_, i) => {
+                const hue = (i * (360 / labels.length)) % 360;
+                return `hsla(${hue}, 70%, 65%, 0.6)`;
+            });
+
+            const chartConfig = {
+                type: 'pie',
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'right',
+                            labels: { font: { family: 'Open Sans', size: 14 } }
+                        }
+                    }
+                }
+            };
+
+            // Create first chart
+            window[chartInstance1] = new Chart(document.getElementById(canvas1Id).getContext('2d'), {
+                ...chartConfig,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataset1,
+                        backgroundColor: chartColors
+                    }]
+                },
+                options: {
+                    ...chartConfig.options,
+                    plugins: {
+                        ...chartConfig.options.plugins,
+                        title: {
+                            display: true,
+                            text: title1,
+                            font: { family: 'Open Sans', size: 16, weight: 'bold' }
+                        }
+                    }
+                }
+            });
+
+            // Create second chart
+            window[chartInstance2] = new Chart(document.getElementById(canvas2Id).getContext('2d'), {
+                ...chartConfig,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataset2,
+                        backgroundColor: chartColors
+                    }]
+                },
+                options: {
+                    ...chartConfig.options,
+                    plugins: {
+                        ...chartConfig.options.plugins,
+                        title: {
+                            display: true,
+                            text: title2,
+                            font: { family: 'Open Sans', size: 16, weight: 'bold' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createBarChart(canvasId, options) {
+            const baseConfig = {
+                type: 'bar',
+                data: {
+                    labels: options.labels,
+                    datasets: [{
+                        label: options.label,
+                        data: options.data,
+                        backgroundColor: options.getBackgroundColor 
+                            ? options.getBackgroundColor(options.data) 
+                            : options.backgroundColor || 'rgba(54, 162, 235, 0.6)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        zoom: {
+                            pan: { enabled: true, mode: 'x' },
+                            zoom: {
+                                wheel: { enabled: true },
+                                drag: { enabled: true },
+                                pinch: { enabled: true },
+                                mode: 'x',
+                                onZoom: options.onZoom || syncZoom,
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    return options.formatLabel 
+                                        ? options.formatLabel(context)
+                                        : `${context.label}: ${formatCurrency(context.raw)}`;
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: options.title,
+                            font: { family: 'Open Sans', size: 16, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: options.formatYAxis 
+                                    ? options.formatYAxis
+                                    : value => formatCurrency(value),
+                                font: { family: 'Open Sans', size: 16 }
+                            }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Open Sans', size: 16 } }
+                        }
+                    }
+                }
+            };
+
+            const chart = new Chart(
+                document.getElementById(canvasId).getContext('2d'),
+                baseConfig
+            );
+
+            // Add to collection if specified
+            if (options.chartCollection) {
+                options.chartCollection.push(chart);
+            }
+
+            return chart;
+        }
+
+        //  synchronize zoom across charts
+        function syncZoom({ chart }) {
+            const { min, max } = chart.scales.x;
+            geographyCharts.forEach(c => {
+                if (c !== chart) {
+                    c.options.scales.x.min = min;
+                    c.options.scales.x.max = max;
+                    c.update();
+                }
+            });
+        }
+
+       
+    </script>
+</body>
+</html>
